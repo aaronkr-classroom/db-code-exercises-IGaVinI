@@ -1,0 +1,308 @@
+DROP TABLE IF EXISTS assign_bus CASCADE;
+DROP TABLE IF EXISTS assign_driver CASCADE;
+DROP TABLE IF EXISTS reserve CASCADE;
+DROP TABLE IF EXISTS tour_bus CASCADE;
+DROP TABLE IF EXISTS driver CASCADE;
+DROP TABLE IF EXISTS tour CASCADE;
+DROP TABLE IF EXISTS customer CASCADE;
+DROP TABLE IF EXISTS staff CASCADE;
+DROP TABLE IF EXISTS task_code CASCADE;
+DROP TABLE IF EXISTS class_code CASCADE;
+
+-- 1. CREATE TABLE
+
+CREATE TABLE class_code (
+    code INTEGER PRIMARY KEY,
+    class VARCHAR(20),
+    basis VARCHAR(50)
+);
+
+CREATE TABLE task_code (
+    code INTEGER PRIMARY KEY,
+    task VARCHAR(50)
+);
+
+CREATE TABLE customer (
+    id VARCHAR(15) PRIMARY KEY,
+    name VARCHAR(20) NOT NULL,
+    cell CHAR(13) NOT NULL UNIQUE,
+    addr VARCHAR(100),
+    c_code INTEGER NOT NULL DEFAULT 3,
+    CONSTRAINT fk_customer_class
+        FOREIGN KEY (c_code) REFERENCES class_code(code),
+    CONSTRAINT chk_customer_class
+        CHECK (c_code IN (1, 2, 3, 4, 5))
+);
+
+CREATE TABLE staff (
+    staff_id INTEGER PRIMARY KEY,
+    name VARCHAR(20) NOT NULL,
+    birthday CHAR(6) NOT NULL,
+    tel CHAR(12) UNIQUE,
+    salary INTEGER DEFAULT 0,
+    t_code INTEGER NOT NULL,
+    hire_date CHAR(8) NOT NULL,
+    CONSTRAINT fk_staff_task
+        FOREIGN KEY (t_code) REFERENCES task_code(code),
+    CONSTRAINT chk_staff_salary
+        CHECK (salary >= 0)
+);
+
+CREATE TABLE tour (
+    tour_num CHAR(8) PRIMARY KEY,
+    departure VARCHAR(50) NOT NULL,
+    arrival VARCHAR(50) NOT NULL,
+    program VARCHAR(100),
+    start_dt TIMESTAMP NOT NULL,
+    end_dt TIMESTAMP NOT NULL,
+    min_num INTEGER NOT NULL,
+    max_num INTEGER NOT NULL,
+    expense INTEGER NOT NULL,
+    deposit INTEGER DEFAULT 15000,
+    dep_yn CHAR(1) DEFAULT 'N',
+    staff_id INTEGER NOT NULL,
+    CONSTRAINT fk_tour_staff
+        FOREIGN KEY (staff_id) REFERENCES staff(staff_id),
+    CONSTRAINT chk_tour_people
+        CHECK (min_num > 0 AND max_num >= min_num),
+    CONSTRAINT chk_tour_expense
+        CHECK (expense >= 0 AND deposit >= 0),
+    CONSTRAINT chk_tour_dep_yn
+        CHECK (dep_yn IN ('Y', 'N')),
+    CONSTRAINT chk_tour_date
+        CHECK (end_dt > start_dt)
+);
+
+CREATE TABLE driver (
+    driver_id INTEGER PRIMARY KEY,
+    name VARCHAR(20) NOT NULL,
+    cell CHAR(13) NOT NULL UNIQUE,
+    license_no VARCHAR(20) NOT NULL UNIQUE,
+    contract_month INTEGER DEFAULT 12,
+    CONSTRAINT chk_driver_contract
+        CHECK (contract_month > 0)
+);
+
+CREATE TABLE tour_bus (
+    bus_id INTEGER PRIMARY KEY,
+    bus_no VARCHAR(20) NOT NULL UNIQUE,
+    seat_count INTEGER NOT NULL,
+    company VARCHAR(50) DEFAULT '자체 운영',
+    CONSTRAINT chk_bus_seat
+        CHECK (seat_count > 0)
+);
+
+CREATE TABLE reserve (
+    customer_id VARCHAR(15) NOT NULL,
+    tour_num CHAR(8) NOT NULL,
+    reserve_dt DATE NOT NULL DEFAULT CURRENT_DATE,
+    deposit_paid_yn CHAR(1) NOT NULL DEFAULT 'N',
+    cancel_yn CHAR(1) NOT NULL DEFAULT 'N',
+    PRIMARY KEY (customer_id, tour_num),
+    CONSTRAINT fk_reserve_customer
+        FOREIGN KEY (customer_id) REFERENCES customer(id),
+    CONSTRAINT fk_reserve_tour
+        FOREIGN KEY (tour_num) REFERENCES tour(tour_num),
+    CONSTRAINT chk_reserve_deposit_paid
+        CHECK (deposit_paid_yn IN ('Y', 'N')),
+    CONSTRAINT chk_reserve_cancel
+        CHECK (cancel_yn IN ('Y', 'N'))
+);
+
+CREATE TABLE assign_driver (
+    tour_num CHAR(8) NOT NULL,
+    driver_id INTEGER NOT NULL,
+    assign_order INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (tour_num, driver_id),
+    CONSTRAINT fk_assign_driver_tour
+        FOREIGN KEY (tour_num) REFERENCES tour(tour_num),
+    CONSTRAINT fk_assign_driver_driver
+        FOREIGN KEY (driver_id) REFERENCES driver(driver_id),
+    CONSTRAINT chk_assign_driver_order
+        CHECK (assign_order > 0)
+);
+
+CREATE TABLE assign_bus (
+    tour_num CHAR(8) NOT NULL,
+    bus_id INTEGER NOT NULL,
+    assign_order INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (tour_num, bus_id),
+    CONSTRAINT fk_assign_bus_tour
+        FOREIGN KEY (tour_num) REFERENCES tour(tour_num),
+    CONSTRAINT fk_assign_bus_bus
+        FOREIGN KEY (bus_id) REFERENCES tour_bus(bus_id),
+    CONSTRAINT chk_assign_bus_order
+        CHECK (assign_order > 0)
+);
+
+-- 2. INSERT DATA
+
+INSERT INTO class_code (code, class, basis) VALUES
+    (1, '최우수', '누적 예약 10회 이상'),
+    (2, '우수', '누적 예약 5회 이상'),
+    (3, '일반', '기본 고객 등급'),
+    (4, '신규', '첫 예약 고객'),
+    (5, '휴면', '최근 1년 예약 없음');
+
+INSERT INTO task_code (code, task) VALUES
+    (1, '여행상품관리'),
+    (2, '예약관리'),
+    (3, '관광버스배차관리'),
+    (4, '직원관리'),
+    (5, '고객관리');
+
+INSERT INTO customer (id, name, cell, addr, c_code) VALUES
+    ('CUST001', '김민준', '010-1111-1111', '서울특별시 강남구', 1),
+    ('CUST002', '이서연', '010-2222-2222', '부산광역시 해운대구', 2),
+    ('CUST003', '박지훈', '010-3333-3333', '대구광역시 수성구', 3),
+    ('CUST004', '최유진', '010-4444-4444', '광주광역시 북구', 2),
+    ('CUST005', '정현우', '010-5555-5555', '대전광역시 유성구', 3);
+
+INSERT INTO staff (staff_id, name, birthday, tel, salary, t_code, hire_date) VALUES
+    (10001, '오하늘', '900101', '02-1111-1111', 3200000, 1, '20200102'),
+    (10002, '문지아', '920315', '02-2222-2222', 3000000, 2, '20210315'),
+    (10003, '강도윤', '880721', '02-3333-3333', 3400000, 3, '20191120'),
+    (10004, '한서준', '950912', '02-4444-4444', 2900000, 4, '20220509'),
+    (10005, '신예린', '970204', '02-5555-5555', 2800000, 5, '20230601');
+
+INSERT INTO tour (
+    tour_num, departure, arrival, program, start_dt, end_dt,
+    min_num, max_num, expense, deposit, dep_yn, staff_id
+) VALUES
+    ('TOUR0001', '서울', '강릉', 'https://tour.example.com/gangneung', '2026-07-01 08:00', '2026-07-02 18:00', 10, 30, 180000, 30000, 'N', 10001),
+    ('TOUR0002', '부산', '경주', 'https://tour.example.com/gyeongju', '2026-07-05 09:00', '2026-07-05 20:00', 8, 25, 95000, 15000, 'N', 10001),
+    ('TOUR0003', '대전', '전주', 'https://tour.example.com/jeonju', '2026-07-10 08:30', '2026-07-10 21:00', 12, 35, 120000, 20000, 'N', 10002),
+    ('TOUR0004', '광주', '여수', 'https://tour.example.com/yeosu', '2026-07-15 07:30', '2026-07-16 19:00', 15, 40, 210000, 40000, 'N', 10002),
+    ('TOUR0005', '서울', '속초', 'https://tour.example.com/sokcho', '2026-07-20 08:00', '2026-07-21 17:00', 10, 30, 170000, 30000, 'N', 10001);
+
+INSERT INTO driver (driver_id, name, cell, license_no, contract_month) VALUES
+    (201, '배성민', '010-6666-0001', 'BUS-201-SEOUL', 24),
+    (202, '윤태호', '010-6666-0002', 'BUS-202-BUSAN', 18),
+    (203, '서지완', '010-6666-0003', 'BUS-203-DAEJEON', 12),
+    (204, '임하준', '010-6666-0004', 'BUS-204-GWANGJU', 24),
+    (205, '조민석', '010-6666-0005', 'BUS-205-DAEGU', 12);
+
+INSERT INTO tour_bus (bus_id, bus_no, seat_count, company) VALUES
+    (301, '서울70바1001', 45, '한빛관광'),
+    (302, '부산70바2002', 35, '바다관광'),
+    (303, '대전70바3003', 45, '중앙관광'),
+    (304, '광주70바4004', 28, '남도관광'),
+    (305, '대구70바5005', 40, '팔공관광');
+
+INSERT INTO reserve (customer_id, tour_num, reserve_dt, deposit_paid_yn, cancel_yn) VALUES
+    ('CUST001', 'TOUR0001', '2026-06-01', 'Y', 'N'),
+    ('CUST002', 'TOUR0001', '2026-06-02', 'Y', 'N'),
+    ('CUST003', 'TOUR0002', '2026-06-03', 'N', 'N'),
+    ('CUST004', 'TOUR0003', '2026-06-04', 'Y', 'N'),
+    ('CUST005', 'TOUR0004', '2026-06-05', 'N', 'N');
+
+INSERT INTO assign_driver (tour_num, driver_id, assign_order) VALUES
+    ('TOUR0001', 201, 1),
+    ('TOUR0002', 202, 1),
+    ('TOUR0003', 203, 1),
+    ('TOUR0004', 204, 1),
+    ('TOUR0005', 205, 1);
+
+INSERT INTO assign_bus (tour_num, bus_id, assign_order) VALUES
+    ('TOUR0001', 301, 1),
+    ('TOUR0002', 302, 1),
+    ('TOUR0003', 303, 1),
+    ('TOUR0004', 304, 1),
+    ('TOUR0005', 305, 1);
+
+-- 3. INDEX
+
+CREATE INDEX tour_arrival_idx ON tour (arrival ASC);
+CREATE INDEX driver_name_idx ON driver (name ASC);
+CREATE INDEX customer_class_idx ON customer (c_code ASC);
+CREATE INDEX reserve_tour_idx ON reserve (tour_num ASC);
+
+-- 4. TEST QUERIES
+
+-- 4-1. Customer Grade Search
+-- 사용자가 입력한 고객 id 예시: CUST001
+SELECT
+    c.id,
+    c.name,
+    cc.class AS customer_grade
+FROM customer c
+JOIN class_code cc ON c.c_code = cc.code
+WHERE c.id = 'CUST001';
+
+-- 4-2. Employee Task Search
+-- 사용자가 입력한 사번 예시: 10003
+SELECT
+    s.staff_id,
+    s.name,
+    tc.task AS staff_task
+FROM staff s
+JOIN task_code tc ON s.t_code = tc.code
+WHERE s.staff_id = 10003;
+
+-- 4-3. Tour Reservation Search
+-- 사용자가 입력한 여행번호 예시: TOUR0001
+SELECT
+    t.tour_num,
+    t.departure,
+    t.arrival,
+    c.name AS customer_name,
+    r.reserve_dt,
+    r.deposit_paid_yn
+FROM reserve r
+JOIN customer c ON r.customer_id = c.id
+JOIN tour t ON r.tour_num = t.tour_num
+WHERE r.tour_num = 'TOUR0001'
+  AND r.cancel_yn = 'N'
+ORDER BY r.reserve_dt;
+
+-- 4-4. Assigned Driver Search
+-- 사용자가 입력한 여행번호 예시: TOUR0001
+SELECT
+    t.tour_num,
+    t.departure,
+    t.arrival,
+    d.name AS driver_name,
+    d.cell AS driver_cell
+FROM tour t
+JOIN assign_driver ad ON t.tour_num = ad.tour_num
+JOIN driver d ON ad.driver_id = d.driver_id
+WHERE t.tour_num = 'TOUR0001';
+
+-- 4-5. INSERT example: 신규 고객 등록
+INSERT INTO customer (id, name, cell, addr)
+VALUES ('CUST006', '홍길동', '010-7777-7777', '충청북도 충주시');
+
+SELECT * FROM customer WHERE id = 'CUST006';
+
+-- 4-6. UPDATE example: 직원 급여 20만 원 증가
+UPDATE staff
+SET salary = salary + 200000
+WHERE staff_id = 10002;
+
+SELECT staff_id, name, salary
+FROM staff
+WHERE staff_id = 10002;
+
+-- 4-7. DELETE example: 예약 정보 삭제
+DELETE FROM reserve
+WHERE customer_id = 'CUST003'
+  AND tour_num = 'TOUR0002';
+
+SELECT *
+FROM reserve
+WHERE customer_id = 'CUST003'
+  AND tour_num = 'TOUR0002';
+
+
+-- 5. DROP TABLE SCRIPT
+
+-- DROP TABLE IF EXISTS assign_bus CASCADE;
+-- DROP TABLE IF EXISTS assign_driver CASCADE;
+-- DROP TABLE IF EXISTS reserve CASCADE;
+-- DROP TABLE IF EXISTS tour_bus CASCADE;
+-- DROP TABLE IF EXISTS driver CASCADE;
+-- DROP TABLE IF EXISTS tour CASCADE;
+-- DROP TABLE IF EXISTS customer CASCADE;
+-- DROP TABLE IF EXISTS staff CASCADE;
+-- DROP TABLE IF EXISTS task_code CASCADE;
+-- DROP TABLE IF EXISTS class_code CASCADE;
